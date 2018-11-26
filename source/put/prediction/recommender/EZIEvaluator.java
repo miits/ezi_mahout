@@ -20,7 +20,9 @@ import org.apache.mahout.common.RandomUtils;
 import java.io.File;
 import java.nio.file.attribute.UserPrincipalNotFoundException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EZIEvaluator {
 
@@ -29,26 +31,37 @@ public class EZIEvaluator {
         DataModel model = new FileDataModel(new File("data/movies.csv"));
         RecommenderEvaluator evaluator = new RMSRecommenderEvaluator();
 
-        List<UserSimilarity> similarities = new ArrayList<UserSimilarity>();
-        similarities.add(new PearsonCorrelationSimilarity(model));
-        similarities.add(new EuclideanDistanceSimilarity(model));
-        similarities.add(new TanimotoCoefficientSimilarity(model));
-        for(UserSimilarity similarity: similarities) {
-            List<UserNeighborhood> neighbourhoods = new ArrayList<UserNeighborhood>();
-            neighbourhoods.add(new ThresholdUserNeighborhood(0.5, similarity, model));
-            neighbourhoods.add(new ThresholdUserNeighborhood(0.7, similarity, model));
-            neighbourhoods.add(new NearestNUserNeighborhood(5, similarity, model));
-            neighbourhoods.add(new NearestNUserNeighborhood(9, similarity, model));
-            for(UserNeighborhood neighborhood: neighbourhoods) {
+        HashMap<String, UserSimilarity> similaritiesByName = new HashMap<>();
+        similaritiesByName.put("Pearson Correlation", new PearsonCorrelationSimilarity(model));
+        similaritiesByName.put("Euclidean Distance", new EuclideanDistanceSimilarity(model));
+        similaritiesByName.put("Tanimoto Coefficient", new TanimotoCoefficientSimilarity(model));
+        for(Map.Entry<String, UserSimilarity> similarity: similaritiesByName.entrySet()) {
+            HashMap<String, UserNeighborhood> neighborhoodsByName = new HashMap<>();
+            neighborhoodsByName.put("Threshold 0.5", new ThresholdUserNeighborhood(0.5, similarity.getValue(), model));
+            neighborhoodsByName.put("Threshold 0.7", new ThresholdUserNeighborhood(0.7, similarity.getValue(), model));
+            neighborhoodsByName.put("NearestN 5", new NearestNUserNeighborhood(5, similarity.getValue(), model));
+            neighborhoodsByName.put("NearestN 9", new NearestNUserNeighborhood(9, similarity.getValue(), model));
+            for(Map.Entry<String, UserNeighborhood> neighborhood: neighborhoodsByName.entrySet()) {
                 RecommenderBuilder recommenderBuilder = new RecommenderBuilder() {
                     @Override
                     public Recommender buildRecommender(DataModel model) throws TasteException {
-                        return new GenericUserBasedRecommender(model, neighborhood, similarity);
+                        return new GenericUserBasedRecommender(model, neighborhood.getValue(), similarity.getValue());
                     }
                 };
                 double score = evaluator.evaluate(recommenderBuilder, null, model, 0.7, 1.0);
-                System.out.println(String.format("%s - %s - score: %f", neighborhood.toString(), similarity.toString(), score));
-//                Threshold  Neighbourhood (0.7) and Euclidean Distance: RMSE = 0.080520
+                System.out.println(String.format("%s - %s - score: %f", similarity.getKey(), neighborhood.getKey(), score));
+//                Tanimoto Coefficient - Threshold 0.5 - score: 0,882644
+//                Tanimoto Coefficient - NearestN 9 - score: 1,067234
+//                Tanimoto Coefficient - Threshold 0.7 - score: NaN
+//                Tanimoto Coefficient - NearestN 5 - score: 1,100279
+//                Pearson Correlation - Threshold 0.5 - score: 0,789053
+//                Pearson Correlation - NearestN 9 - score: 0,810898
+//                Pearson Correlation - Threshold 0.7 - score: 0,742296
+//                Pearson Correlation - NearestN 5 - score: 0,868883
+//                Euclidean Distance - Threshold 0.5 - score: 0,656538
+//                Euclidean Distance - NearestN 9 - score: 0,373923
+//                Euclidean Distance - Threshold 0.7 - score: 0,081290
+//                Euclidean Distance - NearestN 5 - score: 0,330527
             }
         }
     }
